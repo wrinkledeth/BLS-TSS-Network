@@ -1,0 +1,170 @@
+FROM rust:latest
+
+# Define working directory
+WORKDIR /usr/src/app
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y git protobuf-compiler libprotobuf-dev pkg-config libssh-dev build-essential
+
+# Install Foundry and start Anvil
+RUN curl -L https://foundry.paradigm.xyz | bash && \
+    /root/.foundry/bin/foundryup
+
+# Clone latest contracts
+RUN git clone https://github.com/ARPA-Network/BLS-TSS-Network.git
+RUN cd /usr/src/app/BLS-TSS-Network/contracts
+
+# Run forge test and get all dependencies
+CMD /root/.foundry/bin/forge test
+
+# Run Anvil as a background process
+CMD /root/.foundry/bin/anvil --block-time 1 --silent &
+
+# # Deploy controller and adapter contracts
+CMD /root/.foundry/bin/forge script script/ControllerLocalTest.s.sol:ControllerLocalTestScript --fork-url http://localhost:8545 --broadcast
+
+# # Add operators, start the staking pool, stake for a user and some nodes
+CMD /root/.foundry/bin/forge script script/StakeNodeLocalTest.s.sol:StakeNodeLocalTestScript --fork-url http://localhost:8545 --broadcast -g 150
+
+# keep container running
+CMD ["bash", "-c", "tail -f /dev/null"]
+
+
+# root@3efe366ac3b3:/usr/src/app/BLS-TSS-Network/contracts# /root/.foundry/bin/forge script script/ControllerLocalTest.s.sol:ControllerLocalTestScript --fork-url http://localhost:8545 --broadcast
+# [⠆] Compiling...
+# No files changed, compilation skipped
+# Script ran successfully.
+
+# EIP-3855 is not supported in one or more of the RPCs used.
+# Unsupported Chain IDs: 31337.
+# Contracts deployed with a Solidity version equal or higher than 0.8.20 might not work properly.
+# For more information, please see https://eips.ethereum.org/EIPS/eip-3855
+
+# ## Setting up (1) EVMs.
+
+# ==========================
+
+# Chain 31337
+
+# Estimated gas price: 3.000000014 gwei
+
+# Estimated total gas used for script: 27026806
+
+# Estimated amount required: 0.081080418378375284 ETH
+
+# ==========================
+
+# ###
+# Finding wallets for all the necessary addresses...
+# ##
+# Sending transactions [0 - 11].
+# ⠄ [00:00:00] [##########################################################################] 12/12 txes (0.0s)
+# Transactions saved to: /usr/src/app/BLS-TSS-Network/contracts/broadcast/ControllerLocalTest.s.sol/31337/run-latest.json
+
+# Sensitive values saved to: /usr/src/app/BLS-TSS-Network/contracts/cache/ControllerLocalTest.s.sol/31337/run-latest.json
+
+# ##
+# Waiting for receipts.
+# ⠄ [00:00:00] [######################################################################] 12/12 receipts (0.0s)
+# ##### anvil-hardhat 
+# #! BLS.sol
+#  [Success] Hash: 0xf0d6397eeffc80acb0b99970d55b17f3906704efcdc30b8db4ca70797d8547e0
+# Contract Address: 0x5fbdb2315678afecb367f032d93f642f64180aa3
+# Block: 904
+# Paid: 0.004903134011440646 ETH (1634378 gas * 3.000000007 gwei)
+
+
+
+# ##### anvil-hardhat
+# # ! GroupLib.sol
+#  [Success] Hash: 0x618284311a3de8f84400a697c44572cabc4ccd2233bd6f10f0daf8c133f3c988
+# Contract Address: 0xe7f1725e7734ce288f8367e1bb143e90bb3f0512
+# Block: 904
+# Paid: 0.009684315022596735 ETH (3228105 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat 
+# # ! Arpa
+#  [Success] Hash: 0x04898be558c0120f31fc398e8af8fa7c27642b2027f0f8266af061596f4724e7
+# Contract Address: 0x9fe46736679d2d9a65f0992f2272de9f3c7fa6e0
+# Block: 904
+# Paid: 0.002069154004828026 ETH (689718 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+# # ! Staking
+#  [Success] Hash: 0xa89c6d66a28afafeb5fdb5f96564dd36bcc1450990a8b91a12fa2b797986b3c1
+# Contract Address: 0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9
+# Block: 904
+# Paid: 0.011446314026708066 ETH (3815438 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+# # ! Controller
+#  [Success] Hash: 0x97600e8c22e58aacbb43138a6061b18619957d90bd7c2157680bb57d47dabe7b
+# Contract Address: 0xdc64a140aa3e981100a9beca4e685f962f0cf6c9
+# Block: 904
+# Paid: 0.016037271037420299 ETH (5345757 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+#  [Success] Hash: 0x647808e8c386b444c5df35f75227f110ed90144d21f37c503dd378881fd2b8ee
+# Block: 904
+# Paid: 0.000343053000800457 ETH (114351 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+# # ! Adapter
+# [Success] Hash: 0x96a61b9fe5b3766a978f67faf9a92378c739f6e0e876c9bbe9359fa89cab6102
+# Contract Address: 0x0165878a594ca255338adfa4d48449f69242eb8f
+# Block: 904
+# Paid: 0.015274152035639688 ETH (5091384 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+# # ! Adapter Proxy
+#  [Success] Hash: 0x9edaa076315b5b6bcf1ba73280b09ccbe522431c5cf6e7eb9976676739ca4e49
+# Contract Address: 0xa513e6e4b8f2a923d98304ec87f64353c4d5c853
+# Block: 904
+# Paid: 0.000963255002247595 ETH (321085 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+#  [Success] Hash: 0xc40db4b55458b8af9fc7c0dda6aa7563c0a33dea3f30e3eede4b61af398f6c53
+# Block: 904
+# Paid: 0.00076176000177744 ETH (253920 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+#  [Success] Hash: 0x762eca8099afa2da7e164fdeef6d6d90dd365de2bdd866f2cba70dd0537b28e3
+# Block: 904
+# Paid: 0.000364365000850185 ETH (121455 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+#  [Success] Hash: 0xfd6f0b64314a3ed72f8bc82e100e1c174f2bd58cb92c7a662c7da8a143f279a3
+# Block: 904
+# Paid: 0.000265065000618485 ETH (88355 gas * 3.000000007 gwei)
+
+
+# ##### anvil-hardhat
+#  [Success] Hash: 0x28bd5203bbb175424dcd8c74f0a75a69ca375a42f420ec6209ad9ae482250e63
+# Block: 904
+# Paid: 0.000141666000330554 ETH (47222 gas * 3.000000007 gwei)
+
+
+# Transactions saved to: /usr/src/app/BLS-TSS-Network/contracts/broadcast/ControllerLocalTest.s.sol/31337/run-latest.json
+
+# Sensitive values saved to: /usr/src/app/BLS-TSS-Network/contracts/cache/ControllerLocalTest.s.sol/31337/run-latest.json
+
+
+
+# ==========================
+
+# ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+# Total Paid: 0.062253504145258176 ETH (20751168 gas * avg 3.000000007 gwei)
+
+# Transactions saved to: /usr/src/app/BLS-TSS-Network/contracts/broadcast/ControllerLocalTest.s.sol/31337/run-latest.json
+
+# Sensitive values saved to: /usr/src/app/BLS-TSS-Network/contracts/cache/ControllerLocalTest.s.sol/31337/run-latest.json

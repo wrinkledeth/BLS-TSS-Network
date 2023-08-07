@@ -192,18 +192,3 @@ import { ICrossDomainMessenger } from
 cd /home/ubuntu/BLS-TSS-Network/contracts/lib
 yarn
 ```
-
-
-
----
-
-
-## To do rn:
-
-- [x] study optimism docs
-- [x] optimism helloworld / cross chain tutorial using testnet
-- [x] study ruoshan optimism notes
-- [ ] fix devnet with ruoshan
-
-
----

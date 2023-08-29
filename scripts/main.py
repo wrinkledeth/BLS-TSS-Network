@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import subprocess
@@ -5,20 +6,13 @@ import sys
 import time
 from pprint import pprint
 
-import termcolor
 import ruamel.yaml
-from dotenv import load_dotenv, set_key, dotenv_values
+import termcolor
+from dotenv import dotenv_values, load_dotenv, set_key
 
-####################
-# Global Variables #
-####################
-L1_CHAIN_ID = "900"
-L2_CHAIN_ID = "901"
-
-L1_RPC = "http://localhost:8545"
-L2_RPC = "http://localhost:9545"
-
-HIDE_OUTPUT = True  # supress output
+#################
+#! Initial Prep #
+#################
 
 # prep directories
 SCRIPT_DIR = os.getcwd()
@@ -28,6 +22,105 @@ ARPA_NODE_CONFIG_DIR = os.path.join(ARPA_NODE_DIR, "test/conf")
 CONTRACTS_DIR = os.path.join(ROOT_DIR, "contracts")
 ENV_EXAMPLE_PATH = os.path.join(CONTRACTS_DIR, ".env.example")
 ENV_PATH = os.path.join(CONTRACTS_DIR, ".env")
+
+############
+# Argparse #
+############
+
+# Instantiate the argparse object
+parser = argparse.ArgumentParser(description="Deploy to either DEVNET or TESTNET")
+
+# Add the argument for DEVNET or TESTNET
+parser.add_argument(
+    "-d",
+    "--deployment",
+    required=True,
+    choices=["devnet", "testnet"],
+    help="Choose deployment option: DEVNET or TESTNET",
+)
+# Add the argument for verbose output
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action="store_true",
+    help="If selected, verbose output will be printed (full contract deployment output)",
+)
+
+# Parse the arguments
+args = parser.parse_args()
+
+# If -v (verbose) is selected, set HIDE_OUTPUT to False, else set it to True
+HIDE_OUTPUT = not args.verbose
+
+# load .env
+load_dotenv(dotenv_path=ENV_PATH)
+
+# Use the arguments in your code
+if args.deployment == "devnet":
+    print("DEVNET selected for deployment")
+
+    # rpc info
+    L1_CHAIN_ID = os.getenv("DEVNET_L1_CHAIN_ID")
+    L2_CHAIN_ID = os.getenv("DEVNET_L2_CHAIN_ID")
+    L1_RPC = os.getenv("DEVNET_L1_RPC_URL")
+    L2_RPC = os.getenv("DEVNET_L2_RPC_URL")
+
+    # cross domain messenger
+    OP_L1_CROSS_DOMAIN_MESSENGER_ADDRESS = os.getenv(
+        "DEVNET_OP_L1_CROSS_DOMAIN_MESSENGER_ADDRESS"
+    )
+
+    # secrets
+    ADMIN_PRIVATE_KEY = os.getenv("DEVNET_ADMIN_PRIVATE_KEY")
+    USER_PRIVATE_KEY = os.getenv("DEVNET_USER_PRIVATE_KEY")
+    STAKING_NODES_MNEMONIC = os.getenv("DEVNET_STAKING_NODES_MNEMONIC")
+    NODE_1_PK = os.getenv("DEVNET_NODE_1_PRIVATE_KEY")
+    NODE_2_PK = os.getenv("DEVNET_NODE_2_PRIVATE_KEY")
+    NODE_3_PK = os.getenv("DEVNET_NODE_3_PRIVATE_KEY")
+
+
+elif args.deployment == "testnet":
+    print("TESTNET selected for deployment")
+
+    # rpc info
+    L1_CHAIN_ID = os.getenv("TESTNET_L1_CHAIN_ID")
+    L2_CHAIN_ID = os.getenv("TESTNET_L2_CHAIN_ID")
+    L1_RPC = os.getenv("TESTNET_L1_RPC_URL")
+    L2_RPC = os.getenv("TESTNET_L2_RPC_URL")
+
+    # cross domain messenger
+    OP_L1_CROSS_DOMAIN_MESSENGER_ADDRESS = os.getenv(
+        "TESTNET_OP_L1_CROSS_DOMAIN_MESSENGER_ADDRESS"
+    )
+
+    # secrets
+    ADMIN_PRIVATE_KEY = os.getenv("TESTNET_ADMIN_PRIVATE_KEY")
+    USER_PRIVATE_KEY = os.getenv("TESTNET_USER_PRIVATE_KEY")
+    STAKING_NODES_MNEMONIC = os.getenv("TESTNET_STAKING_NODES_MNEMONIC")
+    NODE_1_PK = os.getenv("TESTNET_NODE_1_PRIVATE_KEY")
+    NODE_2_PK = os.getenv("TESTNET_NODE_2_PRIVATE_KEY")
+    NODE_3_PK = os.getenv("TESTNET_NODE_3_PRIVATE_KEY")
+
+# Remaining global variables
+print(f"CONTRACTS_DIR: {CONTRACTS_DIR}")
+print(f"L2_CHAIN_ID: {L2_CHAIN_ID}")
+print(f"L1_CHAIN_ID: {L1_CHAIN_ID}")
+print(f"L1_CROSS_DOMAIN_MESSENGER_ADDRESS: {OP_L1_CROSS_DOMAIN_MESSENGER_ADDRESS}")
+print(f"ADMIN_PRIVATE_KEY: {ADMIN_PRIVATE_KEY}")
+print(f"USER_PRIVATE_KEY: {USER_PRIVATE_KEY}")
+print(f"STAKING_NODES_MNEMONIC: {STAKING_NODES_MNEMONIC}")
+print(f"NODE_1_PK: {NODE_1_PK}")
+print(f"NODE_2_PK: {NODE_2_PK}")
+print(f"NODE_3_PK: {NODE_3_PK}")
+
+# set .env variables
+set_key(ENV_PATH, "OP_CHAIN_ID", L2_CHAIN_ID)
+set_key(ENV_PATH, "ADMIN_PRIVATE_KEY", ADMIN_PRIVATE_KEY)
+set_key(ENV_PATH, "USER_PRIVATE_KEY", USER_PRIVATE_KEY)
+set_key(ENV_PATH, "STAKING_NODES_MNEMONIC", STAKING_NODES_MNEMONIC)
+
+
+# computer contract broadcast paths
 OP_CONTROLLER_ORACLE_BROADCAST_PATH = os.path.join(
     CONTRACTS_DIR,
     "broadcast",
@@ -42,6 +135,10 @@ CONTROLLER_LOCAL_TEST_BROADCAST_PATH = os.path.join(
     L1_CHAIN_ID,
     "run-latest.json",
 )
+
+##########$############
+# ! Utility Functions #
+###########$###########
 
 
 def cprint(text: str, color: str = "green"):
@@ -193,11 +290,13 @@ def wait_command(
 
 def deploy_contracts():
     ##################################
-    ###### Contract Deployment #######
+    #####! Contract Deployment #######
     ##################################
 
-    # 1. Copy .env.example to .env, and load .env file for editing
-    run_command(["cp", ENV_EXAMPLE_PATH, ENV_PATH])
+    # check if .env file exists
+    if not os.path.exists(ENV_PATH):
+        print("Error: .env file not found. Exiting...")
+        sys.exit(1)
 
     # 2. Deploy L2 OPControllerOracleLocalTest contracts (ControllerOracle, Adapter, Arpa)
     # # forge script script/OPControllerOracleLocalTest.s.sol:OPControllerOracleLocalTestScript --fork-url http://localhost:9545 --broadcast
@@ -242,6 +341,16 @@ def deploy_contracts():
     )
     cmd = f"forge script script/OPControllerOracleInitializationLocalTest.s.sol:OPControllerOracleInitializationLocalTestScript --fork-url {L2_RPC} --broadcast"
     cprint(cmd)
+    print("YOOOOOOOOOOOOOOO")
+    # print(f"l1_addresse[OPChainMessenger]: {l1_addresses['OPChainMessenger']}")
+    input_dict = {
+        "OP_ADAPTER_ADDRESS": l2_addresses["ERC1967Proxy"],
+        "OP_ARPA_ADDRESS": l2_addresses["Arpa"],
+        "OP_CONTROLLER_ORACLE_ADDRESS": l2_addresses["ControllerOracle"],
+        "OP_CHAIN_MESSENGER_ADDRESS": l1_addresses["OPChainMessenger"],  # new
+    }
+    pprint(input_dict)
+
     run_command(
         [cmd],
         env={
@@ -287,21 +396,22 @@ def deploy_contracts():
     )
 
 
-def deploy_nodes():  # ! Deploy Nodes
+def deploy_nodes():
     l1_addresses = get_addresses_from_json(CONTROLLER_LOCAL_TEST_BROADCAST_PATH)
     l2_addresses = get_addresses_from_json(OP_CONTROLLER_ORACLE_BROADCAST_PATH)
 
     ######################################
-    ###### ARPA Network Deployment #######
+    #####! ARPA Network Deployment #######
     ######################################
 
     # update config.yml files with correect L1 controller and adapter addresses
     config_files = ["config_1.yml", "config_2.yml", "config_3.yml"]
+    node_private_keys = [NODE_1_PK, NODE_2_PK, NODE_3_PK]
     yaml = ruamel.yaml.YAML()
     yaml.preserve_quotes = True  # preserves quotes
     yaml.indent(sequence=4, offset=2)  # set indentation
 
-    for file in config_files:
+    for i, file in enumerate(config_files):
         file_path = os.path.join(ARPA_NODE_CONFIG_DIR, file)
         with open(file_path, "r") as f:
             data = yaml.load(f)
@@ -315,9 +425,12 @@ def deploy_nodes():  # ! Deploy Nodes
         ]
         data["relayed_chains"][0]["adapter_address"] = l2_addresses["ERC1967Proxy"]
 
-        # # update rpc endpoints # Todo: Looks like this breaks things... we need to use 127.0.0.1 for the node config???
+        # # update rpc endpoints
         data["provider_endpoint"] = L1_RPC
         data["relayed_chains"][0]["provider_endpoint"] = L2_RPC
+
+        # node private key
+        data["account"]["private_key"] = node_private_keys[i]
 
         with open(file_path, "w") as f:
             yaml.dump(data, f)
@@ -413,7 +526,10 @@ def get_last_randomness(address: str, rpc: str) -> str:
     return last_randomness_l1
 
 
-def test_request_randomness():  # ! Integration Testing
+def test_request_randomness():
+    ##################################
+    #####! Integration Testing #######
+    ##################################
     l1_addresses = get_addresses_from_json(CONTROLLER_LOCAL_TEST_BROADCAST_PATH)
     l2_addresses = get_addresses_from_json(OP_CONTROLLER_ORACLE_BROADCAST_PATH)
     # pprint(l1_addresses)
@@ -437,9 +553,9 @@ def test_request_randomness():  # ! Integration Testing
     )
     # print(l2_group_into)
 
-    ############################################
-    ###### L1 Request Randomness Testing #######
-    ############################################
+    #############################################
+    ######  L1 Request Randomness Testing #######
+    #############################################
 
     # 1. Get last randomness
 
@@ -535,7 +651,7 @@ def main():
 
     # print_addresses()
 
-    # if testnet.. comment out the following
+    # if TESTNET.. comment out the following
 
 
 if __name__ == "__main__":
